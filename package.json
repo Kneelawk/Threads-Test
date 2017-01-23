@@ -6,5 +6,8 @@
     "bindings": "^1.2.1",
     "cmake-js": "^3.4.0",
     "nan": "^2.5.1"
+  },
+  "scripts": {
+    "install": "cmake-js compile"
   }
 }
