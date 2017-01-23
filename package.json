@@ -1,0 +1,10 @@
+{
+  "name": "threads-test",
+  "verison": "0.0.1",
+  "main": "threads-test.js",
+  "dependencies": {
+    "bindings": "^1.2.1",
+    "cmake-js": "^3.4.0",
+    "nan": "^2.5.1"
+  }
+}
