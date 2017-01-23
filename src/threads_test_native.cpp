@@ -1,6 +1,7 @@
 #include <nan.h>
 #include <thread>
 #include <atomic>
+#include <iostream>
 
 int width = 3000;
 int height = 2000;
@@ -10,8 +11,8 @@ float fractalX = -1.5;
 float fractalY = -1;
 int iterations = 500;
 std::thread *t = NULL;
-std::atomic_bool generating;
-std::atomic_uint progress;
+std::atomic_bool generating(false);
+std::atomic_uint progress(0);
 char *data = NULL;
 
 typedef struct {
@@ -124,8 +125,12 @@ void generateFractalThread() {
 				data[index + 2] = 0x0;
 				data[index + 3] = 0xFF;
 			}
+
+			progress++;
 		}
 	}
+
+	std::cout << "Done generating.\n";
 
 	// done generating
 	generating.store(false);
@@ -163,18 +168,21 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 			data = new char[width * height * 4];
 		}
 
+		std::cout << "Starting fractal generation...\n";
+
 		t = new std::thread(generateFractalThread);
 	}
 }
 
 void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
-	v8::Local<v8::Object> res;
+	v8::Local<v8::Object> res = Nan::New<v8::Object>();
 	res->Set(Nan::New("progress").ToLocalChecked(),
 			Nan::New<v8::Number>(progress.load()));
 	res->Set(Nan::New("max").ToLocalChecked(),
 			Nan::New<v8::Number>(width * height));
 	res->Set(Nan::New("generating").ToLocalChecked(),
 			Nan::New(generating.load()));
+	info.GetReturnValue().Set(res);
 }
 
 void getResult(const Nan::FunctionCallbackInfo<v8::Value> &info) {
