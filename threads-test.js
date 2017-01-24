@@ -14,8 +14,8 @@ app.use(body_parser.json());
 
 let width, height;
 
-threads_test_native.setDoneCallback(() => {
-  let buffer = new Buffer(threads_test_native.getResult());
+threads_test_native.setDoneCallback((data) => {
+  let buffer = new Buffer(data);
   let png = new Png({
     width,
     height,

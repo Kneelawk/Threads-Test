@@ -192,14 +192,6 @@ void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	info.GetReturnValue().Set(res);
 }
 
-void getResult(const Nan::FunctionCallbackInfo<v8::Value> &info) {
-	if (bufferInit && !generating.load()) {
-		info.GetReturnValue().Set(buffer.Get(info.GetIsolate()));
-	} else {
-		info.GetReturnValue().Set(Nan::Null());
-	}
-}
-
 void waitToFinish(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	if (generating.load()) {
 		t->join();
@@ -224,7 +216,8 @@ void doneCallback(uv_async_t *handle) {
 	v8::Isolate *isolate = v8::Isolate::GetCurrent();
 	v8::HandleScope scope(isolate);
 	v8::Local<v8::Function> func = doneCallbackFunc.Get(isolate);
-	func->Call(isolate->GetCurrentContext(), func, 0, NULL);
+	v8::Local<v8::Value> args[] = { buffer.Get(isolate) };
+	func->Call(isolate->GetCurrentContext(), func, 1, args);
 }
 
 void init(v8::Local<v8::Object> exports) {
@@ -236,8 +229,6 @@ void init(v8::Local<v8::Object> exports) {
 			Nan::New<v8::FunctionTemplate>(generateFractal)->GetFunction());
 	exports->Set(Nan::New("getProgress").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(getProgress)->GetFunction());
-	exports->Set(Nan::New("getResult").ToLocalChecked(),
-			Nan::New<v8::FunctionTemplate>(getResult)->GetFunction());
 	exports->Set(Nan::New("waitToFinish").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(waitToFinish)->GetFunction());
 	exports->Set(Nan::New("setDoneCallback").ToLocalChecked(),
