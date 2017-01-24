@@ -16,6 +16,8 @@ std::atomic_uint progress(0);
 v8::Global<v8::Object> buffer;
 bool bufferInit = false;
 char *data = NULL;
+uv_async_t *doneAsync;
+v8::Global<v8::Function> doneCallbackFunc;
 
 typedef struct {
 	char r;
@@ -134,6 +136,8 @@ void generateFractalThread() {
 
 	// done generating
 	generating.store(false);
+
+	uv_async_send(doneAsync);
 }
 
 void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
@@ -202,7 +206,32 @@ void waitToFinish(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	}
 }
 
+void setDoneCallback(const Nan::FunctionCallbackInfo<v8::Value> &info) {
+	if (info.Length() < 1) {
+		Nan::ThrowTypeError("Wrong number of arguments to setDoneCallback");
+		return;
+	}
+
+	if (!info[0]->IsFunction()) {
+		Nan::ThrowTypeError("Wrong argument types");
+		return;
+	}
+
+	doneCallbackFunc.Reset(info.GetIsolate(), info[0].As<v8::Function>());
+}
+
+void doneCallback(uv_async_t *handle) {
+	v8::Isolate *isolate = v8::Isolate::GetCurrent();
+	v8::HandleScope scope(isolate);
+	v8::Local<v8::Function> func = doneCallbackFunc.Get(isolate);
+	func->Call(isolate->GetCurrentContext(), func, 0, NULL);
+}
+
 void init(v8::Local<v8::Object> exports) {
+	doneAsync = new uv_async_t;
+	uv_loop_t *loop = uv_default_loop();
+	uv_async_init(loop, doneAsync, doneCallback);
+
 	exports->Set(Nan::New("generateFractal").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(generateFractal)->GetFunction());
 	exports->Set(Nan::New("getProgress").ToLocalChecked(),
@@ -211,6 +240,8 @@ void init(v8::Local<v8::Object> exports) {
 			Nan::New<v8::FunctionTemplate>(getResult)->GetFunction());
 	exports->Set(Nan::New("waitToFinish").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(waitToFinish)->GetFunction());
+	exports->Set(Nan::New("setDoneCallback").ToLocalChecked(),
+			Nan::New<v8::FunctionTemplate>(setDoneCallback)->GetFunction());
 }
 
 NODE_MODULE(threads_test_native, init)

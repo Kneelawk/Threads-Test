@@ -9,6 +9,10 @@ app.use(body_parser.json());
 
 let width, height;
 
+threads_test_native.setDoneCallback(() => {
+  console.log("Done generating fractal.");
+});
+
 app.post('/api/generate', (req, res) => {
   threads_test_native.generateFractal(
     req.body.imageWidth || 300,
