@@ -37,7 +37,7 @@ app.get('/api/result', (req, res) => {
       height,
       hasInputAlpha: true
     });
-    png.data = result;
+    png.data = new Buffer(result);
     res.type('image/png');
     return png.pack().pipe(res);
   } else {

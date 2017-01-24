@@ -13,6 +13,8 @@ int iterations = 500;
 std::thread *t = NULL;
 std::atomic_bool generating(false);
 std::atomic_uint progress(0);
+v8::Global<v8::Object> buffer;
+bool bufferInit = false;
 char *data = NULL;
 
 typedef struct {
@@ -130,8 +132,6 @@ void generateFractalThread() {
 		}
 	}
 
-	std::cout << "Done generating.\n";
-
 	// done generating
 	generating.store(false);
 }
@@ -153,6 +153,8 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 			}
 		}
 
+		progress.store(0);
+
 		int oldSize = width * height;
 
 		width = info[0]->Int32Value();
@@ -163,12 +165,13 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 		fractalY = info[5]->NumberValue() - fractalHeight / 2;
 		iterations = info[6]->Int32Value();
 
-		if (!data || oldSize != width * height) {
-			delete data;
-			data = new char[width * height * 4];
+		if (!bufferInit || oldSize != width * height) {
+			v8::Local<v8::Object> buf =
+					Nan::NewBuffer(width * height * 4).ToLocalChecked();
+			buffer.Reset(info.GetIsolate(), buf);
+			data = node::Buffer::Data(buf);
+			bufferInit = true;
 		}
-
-		std::cout << "Starting fractal generation...\n";
 
 		t = new std::thread(generateFractalThread);
 	}
@@ -186,9 +189,8 @@ void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 }
 
 void getResult(const Nan::FunctionCallbackInfo<v8::Value> &info) {
-	if (data && !generating.load()) {
-		info.GetReturnValue().Set(
-				Nan::CopyBuffer(data, width * height).ToLocalChecked());
+	if (bufferInit && !generating.load()) {
+		info.GetReturnValue().Set(buffer.Get(info.GetIsolate()));
 	} else {
 		info.GetReturnValue().Set(Nan::Null());
 	}
