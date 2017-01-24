@@ -3,19 +3,30 @@
 #include <atomic>
 #include <iostream>
 
-int width = 3000;
-int height = 2000;
-float fractalWidth = 3;
-float fractalHeight = 2;
-float fractalX = -1.5;
-float fractalY = -1;
-int iterations = 500;
+// fractal generation settings
+int width;
+int height;
+float fractalWidth;
+float fractalHeight;
+float fractalX;
+float fractalY;
+int iterations;
+
+// fractal generation thread
 std::thread *t = NULL;
+
+// fractal generation stats
 std::atomic_bool generating(false);
 std::atomic_uint progress(0);
+
+// fractal pixel buffer
 v8::Global<v8::Object> buffer;
 char *data = NULL;
+
+// libuv async thread merging callback handle
 uv_async_t *doneAsync;
+
+// javascript callback handle
 v8::Global<v8::Function> doneCallbackFunc;
 
 typedef struct {
@@ -76,6 +87,7 @@ rgb_data fromHSB(float hue, float saturation, float brightness) {
 	return data;
 }
 
+// a modulus function that can handle negatives and decimals
 float mod2(float value, float min, float max) {
 	float size = max - min;
 	if (size == 0)
@@ -90,18 +102,24 @@ float mod2(float value, float min, float max) {
 	return value;
 }
 
+// core function of the fractal generation thread
 void generateFractalThread() {
 	float fx, fy, a, b, aa, bb, twoab;
 	int n, index;
+
+	// generate every pixel
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			index = (x + y * width) * 4;
+
+			// pixel location in complex plane
 			fx = x * fractalWidth / width + fractalX;
 			fy = y * fractalHeight / height + fractalY;
 
 			a = fx;
 			b = fy;
 
+			// how long does it take for the complex number to escape a complex circle with a radius of 4
 			for (n = 0; n < iterations; n++) {
 				aa = a * a;
 				bb = b * b;
@@ -115,6 +133,7 @@ void generateFractalThread() {
 				}
 			}
 
+			// color the pixel appropriately
 			if (n < iterations) {
 				rgb_data color = fromHSB(mod2(n * 3.3f, 0, 256.0f) / 256.0f,
 						1.0f, mod2(n * 16.0f, 0, 256.0f) / 256.0f);
@@ -139,6 +158,7 @@ void generateFractalThread() {
 	uv_async_send(doneAsync);
 }
 
+// called by javascript
 void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	if (!generating.load()) {
 		generating.store(true);
@@ -156,10 +176,10 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 			}
 		}
 
+		// reset progress
 		progress.store(0);
 
-		int oldSize = width * height;
-
+		// get the args
 		width = info[0]->Int32Value();
 		height = info[1]->Int32Value();
 		fractalWidth = info[2]->NumberValue();
@@ -168,15 +188,18 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 		fractalY = info[5]->NumberValue() - fractalHeight / 2;
 		iterations = info[6]->Int32Value();
 
+		// setup the buffer
 		v8::Local<v8::Object> buf =
 				Nan::NewBuffer(width * height * 4).ToLocalChecked();
 		buffer.Reset(info.GetIsolate(), buf);
 		data = node::Buffer::Data(buf);
 
+		// start the generator thread
 		t = new std::thread(generateFractalThread);
 	}
 }
 
+// if javascript want's to know how far the generation has gotten
 void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	v8::Local<v8::Object> res = Nan::New<v8::Object>();
 	res->Set(Nan::New("progress").ToLocalChecked(),
@@ -188,6 +211,7 @@ void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	info.GetReturnValue().Set(res);
 }
 
+// javascript can set the callback function through here
 void setDoneCallback(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	if (info.Length() < 1) {
 		Nan::ThrowTypeError("Wrong number of arguments to setDoneCallback");
@@ -202,6 +226,7 @@ void setDoneCallback(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	doneCallbackFunc.Reset(info.GetIsolate(), info[0].As<v8::Function>());
 }
 
+// called by the uv_async_send(doneAsync);
 void doneCallback(uv_async_t *handle) {
 	v8::Isolate *isolate = v8::Isolate::GetCurrent();
 	v8::HandleScope scope(isolate);
@@ -211,11 +236,14 @@ void doneCallback(uv_async_t *handle) {
 	buffer.Reset();
 }
 
+// called by the node module stuff
 void init(v8::Local<v8::Object> exports) {
+	// register thread merging callback system
 	doneAsync = new uv_async_t;
 	uv_loop_t *loop = uv_default_loop();
 	uv_async_init(loop, doneAsync, doneCallback);
 
+	// add functions to module's exports
 	exports->Set(Nan::New("generateFractal").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(generateFractal)->GetFunction());
 	exports->Set(Nan::New("getProgress").ToLocalChecked(),
