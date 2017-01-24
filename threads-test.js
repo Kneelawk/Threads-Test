@@ -26,19 +26,24 @@ threads_test_native.setDoneCallback((data) => {
 });
 
 app.post('/api/generate', (req, res) => {
-  threads_test_native.generateFractal(
-    req.body.imageWidth || 300,
-    req.body.imageHeight || 200,
-    req.body.fractalWidth || 3,
-    req.body.fractalHeight || 2,
-    req.body.fractalX || 0,
-    req.body.fractalY || 0,
-    req.body.iterations || 100);
+  let progress = threads_test_native.getProgress();
+  if (!progress.generating) {
+    threads_test_native.generateFractal(
+      req.body.imageWidth || 300,
+      req.body.imageHeight || 200,
+      req.body.fractalWidth || 3,
+      req.body.fractalHeight || 2,
+      req.body.fractalX || 0,
+      req.body.fractalY || 0,
+      req.body.iterations || 100);
 
-  width = req.body.imageWidth || 300;
-  height = req.body.imageHeight || 200;
+    width = req.body.imageWidth || 300;
+    height = req.body.imageHeight || 200;
 
-  return res.send(req.body);
+    return res.send(req.body);
+  } else {
+    return res.send(progress);
+  }
 });
 
 app.get('/api/progress', (req, res) => {
