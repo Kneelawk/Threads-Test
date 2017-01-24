@@ -14,7 +14,6 @@ std::thread *t = NULL;
 std::atomic_bool generating(false);
 std::atomic_uint progress(0);
 v8::Global<v8::Object> buffer;
-bool bufferInit = false;
 char *data = NULL;
 uv_async_t *doneAsync;
 v8::Global<v8::Function> doneCallbackFunc;
@@ -169,13 +168,10 @@ void generateFractal(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 		fractalY = info[5]->NumberValue() - fractalHeight / 2;
 		iterations = info[6]->Int32Value();
 
-		if (!bufferInit || oldSize != width * height) {
-			v8::Local<v8::Object> buf =
-					Nan::NewBuffer(width * height * 4).ToLocalChecked();
-			buffer.Reset(info.GetIsolate(), buf);
-			data = node::Buffer::Data(buf);
-			bufferInit = true;
-		}
+		v8::Local<v8::Object> buf =
+				Nan::NewBuffer(width * height * 4).ToLocalChecked();
+		buffer.Reset(info.GetIsolate(), buf);
+		data = node::Buffer::Data(buf);
 
 		t = new std::thread(generateFractalThread);
 	}
@@ -212,6 +208,7 @@ void doneCallback(uv_async_t *handle) {
 	v8::Local<v8::Function> func = doneCallbackFunc.Get(isolate);
 	v8::Local<v8::Value> args[] = { buffer.Get(isolate) };
 	func->Call(isolate->GetCurrentContext(), func, 1, args);
+	buffer.Reset();
 }
 
 void init(v8::Local<v8::Object> exports) {
