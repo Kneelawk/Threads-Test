@@ -192,12 +192,6 @@ void getProgress(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	info.GetReturnValue().Set(res);
 }
 
-void waitToFinish(const Nan::FunctionCallbackInfo<v8::Value> &info) {
-	if (generating.load()) {
-		t->join();
-	}
-}
-
 void setDoneCallback(const Nan::FunctionCallbackInfo<v8::Value> &info) {
 	if (info.Length() < 1) {
 		Nan::ThrowTypeError("Wrong number of arguments to setDoneCallback");
@@ -229,8 +223,6 @@ void init(v8::Local<v8::Object> exports) {
 			Nan::New<v8::FunctionTemplate>(generateFractal)->GetFunction());
 	exports->Set(Nan::New("getProgress").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(getProgress)->GetFunction());
-	exports->Set(Nan::New("waitToFinish").ToLocalChecked(),
-			Nan::New<v8::FunctionTemplate>(waitToFinish)->GetFunction());
 	exports->Set(Nan::New("setDoneCallback").ToLocalChecked(),
 			Nan::New<v8::FunctionTemplate>(setDoneCallback)->GetFunction());
 }
